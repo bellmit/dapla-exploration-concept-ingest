@@ -1,0 +1,8 @@
+server:
+  port: -1
+  host: 0.0.0.0
+  access-log:
+    format: "%h %u %t %r %s %b %{Referer}i %T"
+
+tracing:
+  enabled: false

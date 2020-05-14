@@ -1,0 +1,62 @@
+server:
+  port: 10230
+  host: 0.0.0.0
+  access-log:
+    format: "%h %u %t %r %s %b %{Referer}i %T"
+#  experimental:
+#    http2:
+#      enable: true
+#      max-content-length: 16384
+
+pipe:
+  source:
+    topic: concept-txlog-default
+    provider:
+      name: postgres
+      config:
+        postgres:
+          driver:
+            host: postgres
+            port: 5432
+            user: concept_txlog
+            password: concept_txlog
+            database: concept_txlog
+        rawdata:
+          postgres:
+            consumer:
+              prefetch-size: 10
+              prefetch-poll-interval-when-empty: 1000
+  target:
+    scheme: http
+    host: gsim-lds
+    port: 9091
+    namespace: ns
+    source: concept
+
+tracing:
+  enabled: false
+  service: test-application
+  sampler-type: const
+  sampler-param: 1
+  propagation: b3
+  protocol: http
+  host: localhost
+  port: 14268
+  path: /api/traces
+  paths:
+    - path: "/favicon.ico"
+      enabled: false
+    - path: "/metrics"
+      enabled: false
+    - path: "/metrics/vendor"
+      enabled: false
+    - path: "/metrics/base"
+      enabled: false
+    - path: "/metrics/application"
+      enabled: false
+    - path: "/health"
+      enabled: false
+    - path: "/health/live"
+      enabled: false
+    - path: "/health/ready"
+      enabled: false

@@ -1,0 +1,24 @@
+module no.ssb.dapla.concept_to_gsim_lds {
+    requires io.helidon.webserver;
+    requires io.helidon.health;
+    requires java.logging;
+    requires io.helidon.health.checks;
+    requires io.helidon.metrics;
+    requires org.slf4j;
+    requires jul.to.slf4j;
+    requires logback.classic;
+    requires jdk.unsupported;
+    requires io.helidon.media.jackson.common;
+    requires io.helidon.media.jackson.server;
+    requires com.fasterxml.jackson.databind;
+    requires com.fasterxml.jackson.module.paramnames;
+    requires com.fasterxml.jackson.datatype.jdk8;
+    requires com.fasterxml.jackson.datatype.jsr310;
+    requires io.helidon.webserver.accesslog;
+    requires java.annotation;
+    requires no.ssb.rawdata.api;
+    requires no.ssb.service.provider.api;
+    requires io.helidon.webclient;
+
+    uses no.ssb.rawdata.api.RawdataClientInitializer;
+}
