@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package no.ssb.dapla.concept_to_gsim_lds;
+package no.ssb.dapla.gsim_concept_ingest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,9 +46,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Optional.ofNullable;
 
-public class ConceptToGsimLdsService implements Service {
+public class GsimConceptIngestService implements Service {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ConceptToGsimLdsService.class);
+    private static final Logger LOG = LoggerFactory.getLogger(GsimConceptIngestService.class);
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final Config config;
@@ -56,7 +56,7 @@ public class ConceptToGsimLdsService implements Service {
     final AtomicReference<Pipe> pipeRef = new AtomicReference<>(null);
     final AtomicReference<WebClient> webClientRef = new AtomicReference<>();
 
-    ConceptToGsimLdsService(Config config) {
+    GsimConceptIngestService(Config config) {
         this.config = config;
     }
 

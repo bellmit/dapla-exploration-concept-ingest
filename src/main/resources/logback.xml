@@ -12,7 +12,7 @@
         </encoder>
     </appender>
 
-    <logger name="no.ssb.dapla.concept_to_gsim_lds" level="trace" additivity="false">
+    <logger name="no.ssb.dapla.gsim_concept_ingest" level="trace" additivity="false">
         <appender-ref ref="STDOUT"/>
     </logger>
 

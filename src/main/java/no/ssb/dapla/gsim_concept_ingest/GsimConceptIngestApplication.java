@@ -1,4 +1,4 @@
-package no.ssb.dapla.concept_to_gsim_lds;
+package no.ssb.dapla.gsim_concept_ingest;
 
 
 import ch.qos.logback.classic.util.ContextInitializer;
@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.LogManager;
 
-public class ConceptToGsimLdsApplication {
+public class GsimConceptIngestApplication {
 
     private static final Logger LOG;
 
@@ -33,7 +33,7 @@ public class ConceptToGsimLdsApplication {
         LogManager.getLogManager().reset();
         SLF4JBridgeHandler.removeHandlersForRootLogger();
         SLF4JBridgeHandler.install();
-        LOG = LoggerFactory.getLogger(ConceptToGsimLdsApplication.class);
+        LOG = LoggerFactory.getLogger(GsimConceptIngestApplication.class);
     }
 
     public static void initLogging() {
@@ -46,7 +46,7 @@ public class ConceptToGsimLdsApplication {
      * @throws IOException if there are problems reading logging properties
      */
     public static void main(final String[] args) throws IOException {
-        ConceptToGsimLdsApplication app = new ConceptToGsimLdsApplication(Config.create());
+        GsimConceptIngestApplication app = new GsimConceptIngestApplication(Config.create());
 
         // Try to start the server. If successful, print some info and arrange to
         // print a message at shutdown. If unsuccessful, print the exception.
@@ -66,7 +66,7 @@ public class ConceptToGsimLdsApplication {
 
     private final Map<Class<?>, Object> instanceByType = new ConcurrentHashMap<>();
 
-    ConceptToGsimLdsApplication(Config config) {
+    GsimConceptIngestApplication(Config config) {
         put(Config.class, config);
 
         HealthSupport health = HealthSupport.builder()
@@ -74,7 +74,7 @@ public class ConceptToGsimLdsApplication {
                 .build();
         MetricsSupport metrics = MetricsSupport.create();
 
-        ConceptToGsimLdsService conceptToGsimLdsService = new ConceptToGsimLdsService(config);
+        GsimConceptIngestService conceptToGsimLdsService = new GsimConceptIngestService(config);
 
         WebServer server = WebServer.create(ServerConfiguration.create(config.get("server")), Routing.builder()
                 .register(AccessLogSupport.create(config.get("server.access-log")))
