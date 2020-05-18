@@ -20,10 +20,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.huxhorn.sulky.ulid.ULID;
 import io.helidon.common.http.Http;
+import io.helidon.common.http.MediaType;
 import io.helidon.config.Config;
 import io.helidon.media.common.DefaultMediaSupport;
 import io.helidon.media.jackson.common.JacksonSupport;
 import io.helidon.webclient.WebClient;
+import io.helidon.webclient.WebClientRequestBuilder;
 import io.helidon.webclient.WebClientResponse;
 import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerRequest;
@@ -41,8 +43,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Optional.ofNullable;
 
@@ -52,9 +54,8 @@ public class GsimConceptIngestService implements Service {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final Config config;
-    final AtomicReference<Thread> threadRef = new AtomicReference<>(null);
-    final AtomicReference<Pipe> pipeRef = new AtomicReference<>(null);
-    final AtomicReference<WebClient> webClientRef = new AtomicReference<>();
+
+    private final Map<Class<?>, Object> instanceByType = new ConcurrentHashMap<>();
 
     GsimConceptIngestService(Config config) {
         this.config = config;
@@ -63,17 +64,24 @@ public class GsimConceptIngestService implements Service {
     @Override
     public void update(Routing.Rules rules) {
         rules
+                .get("/trigger", this::getRevisionHandler)
                 .put("/trigger", this::putRevisionHandler)
         ;
     }
 
-    private void putRevisionHandler(ServerRequest request, ServerResponse response) {
-        if (pipeRef.compareAndSet(null, new Pipe())) {
-            Pipe pipe = pipeRef.get();
-            Thread thread = new Thread(pipe);
-            threadRef.set(thread);
-            thread.start();
+    private void getRevisionHandler(ServerRequest request, ServerResponse response) {
+        response.headers().contentType(MediaType.APPLICATION_JSON);
+        response.status(200).send("[]");
+    }
 
+    private void putRevisionHandler(ServerRequest request, ServerResponse response) {
+        instanceByType.computeIfAbsent(RawdataClient.class, k -> {
+            String provider = config.get("pipe.source.provider.name").asString().get();
+            Map<String, String> providerConfig = config.get("pipe.source.provider.config").detach().asMap().get();
+            return ProviderConfigurator.configure(providerConfig, provider, RawdataClientInitializer.class);
+        });
+
+        instanceByType.computeIfAbsent(WebClient.class, k -> {
             Config targetConfig = this.config.get("pipe.target");
             String scheme = targetConfig.get("scheme").asString().get();
             String host = targetConfig.get("host").asString().get();
@@ -84,21 +92,33 @@ public class GsimConceptIngestService implements Service {
             } catch (URISyntaxException e) {
                 throw new RuntimeException(e);
             }
-            WebClient webClient = WebClient.builder()
+
+            return WebClient.builder()
                     .addMediaSupport(DefaultMediaSupport.create(true))
                     .addMediaSupport(JacksonSupport.create())
                     .baseUri(ldsBaseUri)
                     .build();
-            webClientRef.set(webClient);
-        }
+        });
+
+        instanceByType.computeIfAbsent(Pipe.class, k -> {
+            Pipe pipe = new Pipe();
+            Thread thread = new Thread(pipe);
+            instanceByType.put(Thread.class, thread);
+            thread.start();
+            return pipe;
+        });
+
+        response.headers().contentType(MediaType.APPLICATION_JSON);
         response.status(200).send("[]");
     }
 
     private Optional<String> getLatestSourceIdFromTarget() {
         Config targetConfig = this.config.get("pipe.target");
         String source = targetConfig.get("source").asString().get();
-        WebClient webClient = webClientRef.get();
-        WebClientResponse response = webClient.put()
+        WebClient webClient = (WebClient) instanceByType.get(WebClient.class);
+        WebClientRequestBuilder builder = webClient.get();
+        builder.headers().add("Origin", "localhost");
+        WebClientResponse response = builder
                 .path("source/" + source)
                 .submit()
                 .toCompletableFuture()
@@ -117,17 +137,29 @@ public class GsimConceptIngestService implements Service {
     class Pipe implements Runnable {
         @Override
         public void run() {
-            String topic = config.get("pipe.source.topic").asString().get();
-            String provider = config.get("pipe.source.provider.name").asString().get();
-            Map<String, String> providerConfig = config.get("pipe.source.provider.config").detach().asMap().get();
-            try (RawdataClient client = ProviderConfigurator.configure(providerConfig, provider, RawdataClientInitializer.class)) {
+            try {
+                String topic = config.get("pipe.source.topic").asString().get();
                 ULID.Value previousUlid = getLatestSourceIdFromTarget().map(ULID::parseULID).orElse(null);
-                RawdataConsumer consumer = client.consumer(topic, previousUlid, false);
-                RawdataMessage message = consumer.receive(3, TimeUnit.SECONDS);
-                while (message != null) {
-                    sendMessageToTarget(message);
-                    message = consumer.receive(3, TimeUnit.SECONDS);
+                try (RawdataConsumer consumer = ((RawdataClient) instanceByType.get(RawdataClient.class)).consumer(topic, previousUlid, false)) {
+                    RawdataMessage message = consumer.receive(3, TimeUnit.SECONDS);
+                    while (message != null) {
+                        sendMessageToTarget(message);
+                        message = consumer.receive(3, TimeUnit.SECONDS);
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
+            } finally {
+                instanceByType.remove(Pipe.class);
+            }
+        }
+    }
+
+    public void close() {
+        RawdataClient rawdataClient = (RawdataClient) instanceByType.get(RawdataClient.class);
+        if (rawdataClient != null) {
+            try {
+                rawdataClient.close();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
