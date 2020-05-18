@@ -10,7 +10,7 @@
         <relativePath/>
     </parent>
     <groupId>no.ssb.dapla</groupId>
-    <artifactId>dapla-concept-to-gsim-lds</artifactId>
+    <artifactId>dapla-gsim-concept-ingest</artifactId>
     <version>0.1-SNAPSHOT</version>
     <name>${project.artifactId}</name>
 
