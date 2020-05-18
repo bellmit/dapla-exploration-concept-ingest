@@ -53,9 +53,11 @@ public class GsimConceptIngestApplication {
         app.get(WebServer.class).start()
                 .thenAccept(ws -> {
                     System.out.println(
-                            "WEB server is up! http://localhost:" + ws.port() + "/greet");
-                    ws.whenShutdown().thenRun(()
-                            -> System.out.println("WEB server is DOWN. Good bye!"));
+                            "WEB server is up! http://localhost:" + ws.port() + "/pipe/trigger");
+                    ws.whenShutdown().thenRun(() -> {
+                        app.get(GsimConceptIngestService.class).close();
+                        System.out.println("WEB server is DOWN. Good bye!");
+                    });
                 })
                 .exceptionally(t -> {
                     System.err.println("Startup failed: " + t.getMessage());
@@ -75,6 +77,7 @@ public class GsimConceptIngestApplication {
         MetricsSupport metrics = MetricsSupport.create();
 
         GsimConceptIngestService conceptToGsimLdsService = new GsimConceptIngestService(config);
+        put(GsimConceptIngestService.class, conceptToGsimLdsService);
 
         WebServer server = WebServer.create(ServerConfiguration.create(config.get("server")), Routing.builder()
                 .register(AccessLogSupport.create(config.get("server.access-log")))
