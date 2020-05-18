@@ -119,7 +119,7 @@ public class GsimConceptIngestService implements Service {
         public void run() {
             String topic = config.get("pipe.source.topic").asString().get();
             String provider = config.get("pipe.source.provider.name").asString().get();
-            Map<String, String> providerConfig = config.get("pipe.source.provider.config").asMap().get();
+            Map<String, String> providerConfig = config.get("pipe.source.provider.config").detach().asMap().get();
             try (RawdataClient client = ProviderConfigurator.configure(providerConfig, provider, RawdataClientInitializer.class)) {
                 ULID.Value previousUlid = getLatestSourceIdFromTarget().map(ULID::parseULID).orElse(null);
                 RawdataConsumer consumer = client.consumer(topic, previousUlid, false);
