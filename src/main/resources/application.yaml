@@ -16,8 +16,8 @@ pipe:
       config:
         postgres:
           driver:
-            host: postgres
-            port: 5432
+            host: localhost
+            port: 25432
             user: concept_txlog
             password: concept_txlog
             database: concept_txlog
@@ -28,8 +28,8 @@ pipe:
               prefetch-poll-interval-when-empty: 1000
   target:
     scheme: http
-    host: gsim-lds
-    port: 9091
+    host: localhost
+    port: 29091
     namespace: ns
     source: concept
 
