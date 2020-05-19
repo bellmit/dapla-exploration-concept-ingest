@@ -88,6 +88,10 @@ public class GsimConceptIngestApplication {
                 .register("/pipe", conceptToGsimLdsService)
                 .build());
         put(WebServer.class, server);
+
+        if (config.get("pipe.trigger.autostart").asBoolean().orElse(false)) {
+            conceptToGsimLdsService.triggerStart();
+        }
     }
 
     public <T> T put(Class<T> clazz, T instance) {

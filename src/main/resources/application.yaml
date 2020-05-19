@@ -9,6 +9,8 @@ server:
 #      max-content-length: 16384
 
 pipe:
+  trigger:
+    autostart: true
   source:
     topic: concept-txlog-default
     provider:

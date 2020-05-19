@@ -58,12 +58,28 @@ public class GsimConceptIngestService implements Service {
         ;
     }
 
-    private void getRevisionHandler(ServerRequest request, ServerResponse response) {
+    void getRevisionHandler(ServerRequest request, ServerResponse response) {
         response.headers().contentType(MediaType.APPLICATION_JSON);
         response.status(200).send("[]");
     }
 
-    private void putRevisionHandler(ServerRequest request, ServerResponse response) {
+    void putRevisionHandler(ServerRequest request, ServerResponse response) {
+        triggerStart();
+
+        response.headers().contentType(MediaType.APPLICATION_JSON);
+        response.status(200).send("[]");
+    }
+
+    void deleteRevisionHandler(ServerRequest request, ServerResponse response) {
+        triggerStop();
+        response.status(200).send();
+    }
+
+    public void triggerStop() {
+        waitLoopAllowed.set(false);
+    }
+
+    public void triggerStart() {
         instanceByType.computeIfAbsent(RawdataClient.class, k -> {
             String provider = config.get("pipe.source.provider.name").asString().get();
             Map<String, String> providerConfig = config.get("pipe.source.provider.config").detach().asMap().get();
@@ -98,17 +114,9 @@ public class GsimConceptIngestService implements Service {
         });
 
         waitLoopAllowed.set(true);
-
-        response.headers().contentType(MediaType.APPLICATION_JSON);
-        response.status(200).send("[]");
     }
 
-    private void deleteRevisionHandler(ServerRequest request, ServerResponse response) {
-        waitLoopAllowed.set(false);
-        response.status(200).send();
-    }
-
-    private Optional<String> getLatestSourceIdFromTarget() {
+    Optional<String> getLatestSourceIdFromTarget() {
         Config targetConfig = this.config.get("pipe.target");
         String source = targetConfig.get("source").asString().get();
         WebClient webClient = (WebClient) instanceByType.get(WebClient.class);
@@ -126,7 +134,7 @@ public class GsimConceptIngestService implements Service {
         return ofNullable(body.get("lastSourceId").textValue());
     }
 
-    private void sendMessageToTarget(RawdataMessage message) throws IOException {
+    void sendMessageToTarget(RawdataMessage message) throws IOException {
         JsonNode meta = msgPackMapper.readTree(message.get("meta"));
 
         String method = meta.get("method").textValue();
