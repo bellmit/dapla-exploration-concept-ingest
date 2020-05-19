@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Optional.ofNullable;
 
@@ -41,6 +42,7 @@ public class GsimConceptIngestService implements Service {
     private final ObjectMapper msgPackMapper = new ObjectMapper(new MessagePackFactory());
     private final Config config;
 
+    private final AtomicBoolean waitLoopAllowed = new AtomicBoolean(false);
     private final Map<Class<?>, Object> instanceByType = new ConcurrentHashMap<>();
 
     GsimConceptIngestService(Config config) {
@@ -52,6 +54,7 @@ public class GsimConceptIngestService implements Service {
         rules
                 .get("/trigger", this::getRevisionHandler)
                 .put("/trigger", this::putRevisionHandler)
+                .delete("/trigger", this::deleteRevisionHandler)
         ;
     }
 
@@ -94,8 +97,15 @@ public class GsimConceptIngestService implements Service {
             return pipe;
         });
 
+        waitLoopAllowed.set(true);
+
         response.headers().contentType(MediaType.APPLICATION_JSON);
         response.status(200).send("[]");
+    }
+
+    private void deleteRevisionHandler(ServerRequest request, ServerResponse response) {
+        waitLoopAllowed.set(false);
+        response.status(200).send();
     }
 
     private Optional<String> getLatestSourceIdFromTarget() {
@@ -174,10 +184,11 @@ public class GsimConceptIngestService implements Service {
                 String topic = config.get("pipe.source.topic").asString().get();
                 ULID.Value previousUlid = getLatestSourceIdFromTarget().map(ULID::parseULID).orElse(null);
                 try (RawdataConsumer consumer = ((RawdataClient) instanceByType.get(RawdataClient.class)).consumer(topic, previousUlid, false)) {
-                    RawdataMessage message = consumer.receive(3, TimeUnit.SECONDS);
-                    while (message != null) {
-                        sendMessageToTarget(message);
-                        message = consumer.receive(3, TimeUnit.SECONDS);
+                    while (waitLoopAllowed.get()) {
+                        RawdataMessage message = consumer.receive(3, TimeUnit.SECONDS);
+                        if (message != null) {
+                            sendMessageToTarget(message);
+                        }
                     }
                 } catch (Exception e) {
                     throw new RuntimeException(e);
