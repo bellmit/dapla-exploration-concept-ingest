@@ -16,7 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.LogManager;
@@ -43,27 +42,33 @@ public class GsimConceptIngestApplication {
      * Application main entry point.
      *
      * @param args command line arguments.
-     * @throws IOException if there are problems reading logging properties
      */
-    public static void main(final String[] args) throws IOException {
+    public static void main(final String[] args) {
         GsimConceptIngestApplication app = new GsimConceptIngestApplication(Config.create());
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            app.get(GsimConceptIngestService.class).close();
+            app.get(WebServer.class).shutdown().toCompletableFuture().join();
+            LOG.info("Shutdown complete.");
+        }));
 
         // Try to start the server. If successful, print some info and arrange to
         // print a message at shutdown. If unsuccessful, print the exception.
         app.get(WebServer.class).start()
                 .thenAccept(ws -> {
-                    System.out.println(
-                            "WEB server is up! http://localhost:" + ws.port() + "/pipe/trigger");
-                    ws.whenShutdown().thenRun(() -> {
-                        app.get(GsimConceptIngestService.class).close();
-                        System.out.println("WEB server is DOWN. Good bye!");
-                    });
+                    LOG.info("WebServer running at port " + ws.port());
                 })
                 .exceptionally(t -> {
-                    System.err.println("Startup failed: " + t.getMessage());
-                    t.printStackTrace(System.err);
+                    LOG.error("Startup failed", t);
                     return null;
-                });
+                })
+                .toCompletableFuture()
+                .join();
+
+        if (app.get(Config.class).get("pipe.trigger.autostart").asBoolean().orElse(false)) {
+            LOG.info("Pipe triggered automatically.");
+            app.get(GsimConceptIngestService.class).triggerStart();
+        }
     }
 
     private final Map<Class<?>, Object> instanceByType = new ConcurrentHashMap<>();
@@ -88,10 +93,6 @@ public class GsimConceptIngestApplication {
                 .register("/pipe", conceptToGsimLdsService)
                 .build());
         put(WebServer.class, server);
-
-        if (config.get("pipe.trigger.autostart").asBoolean().orElse(false)) {
-            conceptToGsimLdsService.triggerStart();
-        }
     }
 
     public <T> T put(Class<T> clazz, T instance) {
