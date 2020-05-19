@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -122,14 +123,19 @@ public class GsimConceptIngestService implements Service {
         WebClient webClient = (WebClient) instanceByType.get(WebClient.class);
         WebClientRequestBuilder builder = webClient.get();
         builder.headers().add("Origin", "localhost");
+        builder.path("source/" + source);
+
         WebClientResponse response = builder
-                .path("source/" + source)
+                .connectTimeout(120, ChronoUnit.SECONDS)
+                .readTimeout(10, ChronoUnit.SECONDS)
                 .submit()
                 .toCompletableFuture()
                 .join();
+
         if (!Http.ResponseStatus.Family.SUCCESSFUL.equals(response.status().family())) {
             throw new RuntimeException("Got http status code " + response.status() + " with reason: " + response.status().reasonPhrase());
         }
+
         JsonNode body = response.content().as(JsonNode.class).toCompletableFuture().join();
         return ofNullable(body.get("lastSourceId").textValue());
     }
