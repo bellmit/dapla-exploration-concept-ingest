@@ -43,7 +43,7 @@ public class GsimConceptIngestApplication {
      *
      * @param args command line arguments.
      */
-    public static void main(final String[] args) {
+    public static void main(final String[] args) throws InterruptedException {
         GsimConceptIngestApplication app = new GsimConceptIngestApplication(Config.create());
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -65,7 +65,11 @@ public class GsimConceptIngestApplication {
                 .toCompletableFuture()
                 .join();
 
-        if (app.get(Config.class).get("pipe.trigger.autostart").asBoolean().orElse(false)) {
+        if (app.get(Config.class).get("pipe.trigger.autostart.enabled").asBoolean().orElse(false)) {
+            int delaySeconds = app.get(Config.class).get("pipe.trigger.autostart.delaysec").asInt().orElse(0);
+            if (delaySeconds > 0) {
+                Thread.sleep(1000 * Math.min(3600, delaySeconds));
+            }
             LOG.info("Pipe triggered automatically.");
             app.get(GsimConceptIngestService.class).triggerStart();
         }

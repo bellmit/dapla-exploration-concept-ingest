@@ -10,7 +10,9 @@ server:
 
 pipe:
   trigger:
-    autostart: true
+    autostart:
+      enabled: true
+      delaysec: 45
   source:
     topic: concept-txlog-default
     provider:
