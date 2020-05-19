@@ -105,12 +105,12 @@ public class GsimConceptIngestService implements Service {
                     .build();
         });
 
-        instanceByType.computeIfAbsent(Pipe.class, k -> {
-            Pipe pipe = new Pipe();
+        Pipe pipe = (Pipe) instanceByType.computeIfAbsent(Pipe.class, k -> new Pipe());
+
+        instanceByType.computeIfAbsent(Thread.class, k -> {
             Thread thread = new Thread(pipe);
-            instanceByType.put(Thread.class, thread);
             thread.start();
-            return pipe;
+            return thread;
         });
 
         waitLoopAllowed.set(true);
