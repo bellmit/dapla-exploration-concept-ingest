@@ -27,6 +27,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
@@ -41,6 +43,7 @@ public class GsimConceptIngestService implements Service {
     private static final Logger LOG = LoggerFactory.getLogger(GsimConceptIngestService.class);
 
     private final ObjectMapper msgPackMapper = new ObjectMapper(new MessagePackFactory());
+    private final ObjectMapper mapper = new ObjectMapper();
     private final Config config;
 
     private final AtomicBoolean waitLoopAllowed = new AtomicBoolean(false);
@@ -155,7 +158,7 @@ public class GsimConceptIngestService implements Service {
 
         WebClient webClient = (WebClient) instanceByType.get(WebClient.class);
 
-        String path = String.format("%s/%s/%s", namespace, entity, id);
+        String path = String.format("/%s/%s/%s", namespace, entity, id);
 
         if ("PUT".equals(method)) {
             JsonNode data = msgPackMapper.readTree(message.get("data"));
@@ -170,6 +173,13 @@ public class GsimConceptIngestService implements Service {
                     .toCompletableFuture()
                     .join();
             if (!Http.ResponseStatus.Family.SUCCESSFUL.equals(response.status().family())) {
+                LOG.warn("Unsuccessful HTTP response while attempting to perform: PUT {}?timestamp={}&source={}&sourceId={}   DATA: {}",
+                        path,
+                        URLEncoder.encode(versionStr, StandardCharsets.UTF_8),
+                        URLEncoder.encode(source, StandardCharsets.UTF_8),
+                        URLEncoder.encode(sourceId, StandardCharsets.UTF_8),
+                        mapper.writeValueAsString(data)
+                );
                 throw new RuntimeException("Got http status code " + response.status() + " with reason: " + response.status().reasonPhrase());
             }
         } else if ("DELETE".equals(method)) {
@@ -184,6 +194,12 @@ public class GsimConceptIngestService implements Service {
                     .toCompletableFuture()
                     .join();
             if (!Http.ResponseStatus.Family.SUCCESSFUL.equals(response.status().family())) {
+                LOG.warn("Unsuccessful HTTP response while attempting to perform: DELETE {}?timestamp={}&source={}&sourceId={}",
+                        path,
+                        URLEncoder.encode(versionStr, StandardCharsets.UTF_8),
+                        URLEncoder.encode(source, StandardCharsets.UTF_8),
+                        URLEncoder.encode(sourceId, StandardCharsets.UTF_8)
+                );
                 throw new RuntimeException("Got http status code " + response.status() + " with reason: " + response.status().reasonPhrase());
             }
         } else {
