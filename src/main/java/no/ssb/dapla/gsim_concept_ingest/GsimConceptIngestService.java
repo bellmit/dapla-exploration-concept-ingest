@@ -209,6 +209,7 @@ public class GsimConceptIngestService implements Service {
                 }
             } finally {
                 instanceByType.remove(Pipe.class);
+                instanceByType.remove(Thread.class);
             }
         }
     }
