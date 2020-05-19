@@ -20,9 +20,11 @@ import no.ssb.rawdata.api.RawdataClientInitializer;
 import no.ssb.rawdata.api.RawdataConsumer;
 import no.ssb.rawdata.api.RawdataMessage;
 import no.ssb.service.provider.api.ProviderConfigurator;
+import org.msgpack.jackson.dataformat.MessagePackFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
@@ -36,7 +38,7 @@ public class GsimConceptIngestService implements Service {
 
     private static final Logger LOG = LoggerFactory.getLogger(GsimConceptIngestService.class);
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper msgPackMapper = new ObjectMapper(new MessagePackFactory());
     private final Config config;
 
     private final Map<Class<?>, Object> instanceByType = new ConcurrentHashMap<>();
@@ -114,8 +116,55 @@ public class GsimConceptIngestService implements Service {
         return ofNullable(body.get("lastSourceId").textValue());
     }
 
-    private void sendMessageToTarget(RawdataMessage message) {
-        System.out.printf("Going to send the following message to target: %n%s%n", message);
+    private void sendMessageToTarget(RawdataMessage message) throws IOException {
+        JsonNode meta = msgPackMapper.readTree(message.get("meta"));
+
+        String method = meta.get("method").textValue();
+        String sourceNamespace = meta.get("namespace").textValue();
+        String entity = meta.get("entity").textValue();
+        String id = meta.get("id").textValue();
+        String versionStr = meta.get("version").textValue();
+
+        String namespace = config.get("pipe.target.namespace").asString().get();
+        String source = config.get("pipe.target.source").asString().get();
+        String sourceId = message.ulid().toString();
+
+        WebClient webClient = (WebClient) instanceByType.get(WebClient.class);
+
+        String path = String.format("%s/%s/%s", namespace, entity, id);
+
+        if ("PUT".equals(method)) {
+            JsonNode data = msgPackMapper.readTree(message.get("data"));
+            WebClientRequestBuilder builder = webClient.put();
+            builder.headers().add("Origin", "localhost");
+            WebClientResponse response = builder
+                    .path(path)
+                    .queryParam("timestamp", versionStr)
+                    .queryParam("source", source)
+                    .queryParam("sourceId", sourceId)
+                    .submit(data)
+                    .toCompletableFuture()
+                    .join();
+            if (!Http.ResponseStatus.Family.SUCCESSFUL.equals(response.status().family())) {
+                throw new RuntimeException("Got http status code " + response.status() + " with reason: " + response.status().reasonPhrase());
+            }
+        } else if ("DELETE".equals(method)) {
+            WebClientRequestBuilder builder = webClient.delete();
+            builder.headers().add("Origin", "localhost");
+            WebClientResponse response = builder
+                    .path(path)
+                    .queryParam("timestamp", versionStr)
+                    .queryParam("source", source)
+                    .queryParam("sourceId", sourceId)
+                    .submit()
+                    .toCompletableFuture()
+                    .join();
+            if (!Http.ResponseStatus.Family.SUCCESSFUL.equals(response.status().family())) {
+                throw new RuntimeException("Got http status code " + response.status() + " with reason: " + response.status().reasonPhrase());
+            }
+        } else {
+            throw new RuntimeException("Unsupported method: " + method);
+        }
     }
 
     class Pipe implements Runnable {
