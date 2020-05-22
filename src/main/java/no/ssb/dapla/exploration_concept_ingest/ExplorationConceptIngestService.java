@@ -1,4 +1,4 @@
-package no.ssb.dapla.gsim_concept_ingest;
+package no.ssb.dapla.exploration_concept_ingest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,9 +38,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Optional.ofNullable;
 
-public class GsimConceptIngestService implements Service {
+public class ExplorationConceptIngestService implements Service {
 
-    private static final Logger LOG = LoggerFactory.getLogger(GsimConceptIngestService.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ExplorationConceptIngestService.class);
 
     private final ObjectMapper msgPackMapper = new ObjectMapper(new MessagePackFactory());
     private final ObjectMapper mapper = new ObjectMapper();
@@ -49,7 +49,7 @@ public class GsimConceptIngestService implements Service {
     private final AtomicBoolean waitLoopAllowed = new AtomicBoolean(false);
     private final Map<Class<?>, Object> instanceByType = new ConcurrentHashMap<>();
 
-    GsimConceptIngestService(Config config) {
+    ExplorationConceptIngestService(Config config) {
         this.config = config;
     }
 

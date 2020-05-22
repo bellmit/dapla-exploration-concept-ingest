@@ -17,7 +17,7 @@ FROM alpine:latest
 COPY --from=build /linked /jdk/
 COPY run.sh /app/
 COPY target/libs /app/lib/
-COPY target/dapla-gsim-concept-ingest*.jar /app/lib/
+COPY target/dapla-exploration-concept-ingest*.jar /app/lib/
 COPY target/classes/logback.xml /app/conf/
 COPY target/classes/logback-bip.xml /app/conf/
 COPY target/classes/application.yaml /app/conf/

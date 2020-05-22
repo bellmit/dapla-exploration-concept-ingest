@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package no.ssb.dapla.gsim_concept_ingest;
+package no.ssb.dapla.exploration_concept_ingest;
 
 import io.helidon.config.Config;
 import io.helidon.media.common.DefaultMediaSupport;
@@ -32,12 +32,12 @@ import java.util.concurrent.TimeUnit;
 
 import static io.helidon.config.ConfigSources.classpath;
 
-public class GsimConceptIngestApplicationTest {
+public class ExplorationConceptIngestApplicationTest {
 
-    private static final Logger LOG = LoggerFactory.getLogger(GsimConceptIngestApplicationTest.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ExplorationConceptIngestApplicationTest.class);
 
     static {
-        GsimConceptIngestApplication.initLogging();
+        ExplorationConceptIngestApplication.initLogging();
     }
 
     private static WebServer webServer;
@@ -50,7 +50,7 @@ public class GsimConceptIngestApplicationTest {
                 .metaConfig()
                 .build();
         long webServerStart = System.currentTimeMillis();
-        webServer = new GsimConceptIngestApplication(config).get(WebServer.class);
+        webServer = new ExplorationConceptIngestApplication(config).get(WebServer.class);
         webServer.start().toCompletableFuture()
                 .thenAccept(webServer -> {
                     long duration = System.currentTimeMillis() - webServerStart;

@@ -15,7 +15,7 @@
     <name>${project.artifactId}</name>
 
     <properties>
-        <mainClass>no.ssb.dapla.gsim_concept_ingest.GsimConceptIngestApplication</mainClass>
+        <mainClass>no.ssb.dapla.exploration_concept_ingest.ExplorationConceptIngestApplication</mainClass>
         <slf4j.version>1.7.30</slf4j.version>
     </properties>
 

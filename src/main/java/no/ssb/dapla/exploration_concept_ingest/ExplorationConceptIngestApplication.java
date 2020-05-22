@@ -1,4 +1,4 @@
-package no.ssb.dapla.gsim_concept_ingest;
+package no.ssb.dapla.exploration_concept_ingest;
 
 
 import ch.qos.logback.classic.util.ContextInitializer;
@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.LogManager;
 
-public class GsimConceptIngestApplication {
+public class ExplorationConceptIngestApplication {
 
     private static final Logger LOG;
 
@@ -32,7 +32,7 @@ public class GsimConceptIngestApplication {
         LogManager.getLogManager().reset();
         SLF4JBridgeHandler.removeHandlersForRootLogger();
         SLF4JBridgeHandler.install();
-        LOG = LoggerFactory.getLogger(GsimConceptIngestApplication.class);
+        LOG = LoggerFactory.getLogger(ExplorationConceptIngestApplication.class);
     }
 
     public static void initLogging() {
@@ -44,10 +44,10 @@ public class GsimConceptIngestApplication {
      * @param args command line arguments.
      */
     public static void main(final String[] args) throws InterruptedException {
-        GsimConceptIngestApplication app = new GsimConceptIngestApplication(Config.create());
+        ExplorationConceptIngestApplication app = new ExplorationConceptIngestApplication(Config.create());
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            app.get(GsimConceptIngestService.class).close();
+            app.get(ExplorationConceptIngestService.class).close();
             app.get(WebServer.class).shutdown().toCompletableFuture().join();
             LOG.info("Shutdown complete.");
         }));
@@ -71,13 +71,13 @@ public class GsimConceptIngestApplication {
                 Thread.sleep(1000 * Math.min(3600, delaySeconds));
             }
             LOG.info("Pipe triggered automatically.");
-            app.get(GsimConceptIngestService.class).triggerStart();
+            app.get(ExplorationConceptIngestService.class).triggerStart();
         }
     }
 
     private final Map<Class<?>, Object> instanceByType = new ConcurrentHashMap<>();
 
-    GsimConceptIngestApplication(Config config) {
+    ExplorationConceptIngestApplication(Config config) {
         put(Config.class, config);
 
         HealthSupport health = HealthSupport.builder()
@@ -85,8 +85,8 @@ public class GsimConceptIngestApplication {
                 .build();
         MetricsSupport metrics = MetricsSupport.create();
 
-        GsimConceptIngestService conceptToGsimLdsService = new GsimConceptIngestService(config);
-        put(GsimConceptIngestService.class, conceptToGsimLdsService);
+        ExplorationConceptIngestService conceptToExplorationLdsService = new ExplorationConceptIngestService(config);
+        put(ExplorationConceptIngestService.class, conceptToExplorationLdsService);
 
         WebServer server = WebServer.create(ServerConfiguration.create(config.get("server")), Routing.builder()
                 .register(AccessLogSupport.create(config.get("server.access-log")))
@@ -94,7 +94,7 @@ public class GsimConceptIngestApplication {
                 .register(JacksonSupport.create())
                 .register(health)  // "/health"
                 .register(metrics) // "/metrics"
-                .register("/pipe", conceptToGsimLdsService)
+                .register("/pipe", conceptToExplorationLdsService)
                 .build());
         put(WebServer.class, server);
     }
