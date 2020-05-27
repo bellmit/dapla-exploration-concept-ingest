@@ -8,7 +8,6 @@ import io.helidon.webserver.WebServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +53,7 @@ public class ExplorationConceptIngestApplicationTest {
         }
     }
 
-    @Test
+    //@Test
     public void testHelloWorld() {
         WebClient webClient = WebClient.builder()
                 .baseUri("http://localhost:" + webServer.port())

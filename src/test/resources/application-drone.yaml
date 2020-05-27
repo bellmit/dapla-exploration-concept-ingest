@@ -1,0 +1,24 @@
+server:
+  port: 0
+  host: 0.0.0.0
+  access-log:
+    format: "%h %u %t %r %s %b %{Referer}i %T"
+
+pipe:
+  trigger:
+    autostart:
+      enabled: true
+      delaysec: 45
+  source:
+    topic: concept-txlog-default
+    provider:
+      name: memory
+  target:
+    scheme: http
+    host: localhost
+    port: 29091
+    namespace: ns
+    source: concept
+
+tracing:
+  enabled: false
