@@ -20,6 +20,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.LogManager;
 
+import static io.helidon.config.ConfigSources.classpath;
+import static io.helidon.config.ConfigSources.file;
+
 public class ExplorationConceptIngestApplication {
 
     private static final Logger LOG;
@@ -38,13 +41,24 @@ public class ExplorationConceptIngestApplication {
     public static void initLogging() {
     }
 
+    public static Config createDefaultConfig() {
+        Config.Builder builder = Config.builder();
+        String overrideFile = System.getenv("HELIDON_CONFIG_FILE");
+        if (overrideFile != null) {
+            builder.addSource(file(overrideFile).optional());
+        }
+        builder.addSource(file("conf/application.yaml").optional());
+        builder.addSource(classpath("application.yaml"));
+        return Config.builder().build();
+    }
+
     /**
      * Application main entry point.
      *
      * @param args command line arguments.
      */
     public static void main(final String[] args) throws InterruptedException {
-        ExplorationConceptIngestApplication app = new ExplorationConceptIngestApplication(Config.create());
+        ExplorationConceptIngestApplication app = new ExplorationConceptIngestApplication(createDefaultConfig());
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             app.get(ExplorationConceptIngestService.class).close();
