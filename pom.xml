@@ -93,6 +93,12 @@
             <version>1.2.3</version>
         </dependency>
         <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>6.3</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
             <groupId>io.helidon.bundles</groupId>
             <artifactId>helidon-bundles-webserver</artifactId>
             <scope>runtime</scope>
