@@ -49,7 +49,7 @@ public class ExplorationConceptIngestApplication {
         }
         builder.addSource(file("conf/application.yaml").optional());
         builder.addSource(classpath("application.yaml"));
-        return Config.builder().build();
+        return builder.build();
     }
 
     /**
