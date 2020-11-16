@@ -2,7 +2,7 @@ package no.ssb.dapla.exploration_concept_ingest;
 
 import io.helidon.config.Config;
 import io.helidon.media.common.DefaultMediaSupport;
-import io.helidon.media.jackson.common.JacksonSupport;
+import io.helidon.media.jackson.JacksonSupport;
 import io.helidon.webclient.WebClient;
 import io.helidon.webserver.WebServer;
 import org.junit.jupiter.api.AfterAll;
@@ -57,7 +57,7 @@ public class ExplorationConceptIngestApplicationTest {
     public void testHelloWorld() {
         WebClient webClient = WebClient.builder()
                 .baseUri("http://localhost:" + webServer.port())
-                .addMediaSupport(DefaultMediaSupport.create(true))
+                .addMediaSupport(DefaultMediaSupport.create())
                 .addMediaSupport(JacksonSupport.create())
                 .build();
 

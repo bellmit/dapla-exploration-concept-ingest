@@ -7,7 +7,7 @@ import io.helidon.common.http.Http;
 import io.helidon.common.http.MediaType;
 import io.helidon.config.Config;
 import io.helidon.media.common.DefaultMediaSupport;
-import io.helidon.media.jackson.common.JacksonSupport;
+import io.helidon.media.jackson.JacksonSupport;
 import io.helidon.webclient.WebClient;
 import io.helidon.webclient.WebClientRequestBuilder;
 import io.helidon.webclient.WebClientResponse;
@@ -29,7 +29,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -103,7 +102,7 @@ public class ExplorationConceptIngestService implements Service {
             }
 
             return WebClient.builder()
-                    .addMediaSupport(DefaultMediaSupport.create(true))
+                    .addMediaSupport(DefaultMediaSupport.create())
                     .addMediaSupport(JacksonSupport.create())
                     .baseUri(ldsBaseUri)
                     .build();
@@ -129,8 +128,8 @@ public class ExplorationConceptIngestService implements Service {
         builder.path("source/" + source);
 
         WebClientResponse response = builder
-                .connectTimeout(120, ChronoUnit.SECONDS)
-                .readTimeout(10, ChronoUnit.SECONDS)
+                .connectTimeout(120, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
                 .submit()
                 .toCompletableFuture()
                 .join();

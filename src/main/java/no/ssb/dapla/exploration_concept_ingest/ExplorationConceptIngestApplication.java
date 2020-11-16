@@ -5,10 +5,9 @@ import ch.qos.logback.classic.util.ContextInitializer;
 import io.helidon.config.Config;
 import io.helidon.health.HealthSupport;
 import io.helidon.health.checks.HealthChecks;
-import io.helidon.media.jackson.server.JacksonSupport;
+import io.helidon.media.jackson.JacksonSupport;
 import io.helidon.metrics.MetricsSupport;
 import io.helidon.webserver.Routing;
-import io.helidon.webserver.ServerConfiguration;
 import io.helidon.webserver.WebServer;
 import io.helidon.webserver.WebTracingConfig;
 import io.helidon.webserver.accesslog.AccessLogSupport;
@@ -102,14 +101,21 @@ public class ExplorationConceptIngestApplication {
         ExplorationConceptIngestService conceptToExplorationLdsService = new ExplorationConceptIngestService(config);
         put(ExplorationConceptIngestService.class, conceptToExplorationLdsService);
 
-        WebServer server = WebServer.create(ServerConfiguration.create(config.get("server")), Routing.builder()
+        Routing routing = Routing.builder()
                 .register(AccessLogSupport.create(config.get("server.access-log")))
-                .register(WebTracingConfig.create(config.get("tracing")))
-                .register(JacksonSupport.create())
+                .register(WebTracingConfig.builder()
+                        .config(config.get("tracing"))
+                        .build())
                 .register(health)  // "/health"
                 .register(metrics) // "/metrics"
                 .register("/pipe", conceptToExplorationLdsService)
-                .build());
+                .build();
+
+        WebServer server = WebServer.builder()
+                .config(config.get("server"))
+                .addMediaSupport(JacksonSupport.create())
+                .routing(routing)
+                .build();
         put(WebServer.class, server);
     }
 
