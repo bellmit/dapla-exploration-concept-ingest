@@ -185,6 +185,7 @@ public class ExplorationConceptIngestService implements Service {
             WebClientRequestBuilder builder = webClient.delete();
             builder.headers().add("Origin", "localhost");
             WebClientResponse response = builder
+                    .skipUriEncoding()
                     .path(path)
                     .queryParam("timestamp", versionStr)
                     .queryParam("source", source)
