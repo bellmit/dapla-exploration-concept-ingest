@@ -69,8 +69,19 @@ public class ExplorationConceptIngestService implements Service {
     }
 
     void getRevisionHandler(ServerRequest request, ServerResponse response) {
-        response.headers().contentType(MediaType.APPLICATION_JSON);
-        response.status(200).send("[]");
+        Pipe pipe = (Pipe) instanceByType.get(Pipe.class);
+        if (pipe != null) {
+            response.headers().contentType(MediaType.APPLICATION_JSON);
+            response.status(200).send(msgPackMapper.createObjectNode()
+                    .put("status", "RUNNING")
+                    .put("startedTime", pipe.startedAt.format(DateTimeFormatter.ISO_INSTANT))
+                    .toPrettyString());
+        } else {
+            response.headers().contentType(MediaType.APPLICATION_JSON);
+            response.status(200).send(msgPackMapper.createObjectNode()
+                    .put("status", "STOPPED")
+                    .toPrettyString());
+        }
     }
 
     void putRevisionHandler(ServerRequest request, ServerResponse response) {
@@ -215,6 +226,12 @@ public class ExplorationConceptIngestService implements Service {
     }
 
     class Pipe implements Runnable {
+        final ZonedDateTime startedAt;
+
+        Pipe() {
+            startedAt = ZonedDateTime.now(ZoneOffset.UTC);
+        }
+
         @Override
         public void run() {
             try {
