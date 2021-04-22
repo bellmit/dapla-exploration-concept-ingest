@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.huxhorn.sulky.ulid.ULID;
+import io.github.resilience4j.core.IntervalFunction;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
 import io.helidon.common.http.Http;
 import io.helidon.common.http.MediaType;
 import io.helidon.config.Config;
@@ -26,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
@@ -49,7 +53,6 @@ public class ExplorationConceptIngestService implements Service {
     private static final Logger LOG = LoggerFactory.getLogger(ExplorationConceptIngestService.class);
 
     private final ObjectMapper msgPackMapper = new ObjectMapper(new MessagePackFactory());
-    private final ObjectMapper mapper = new ObjectMapper();
     private final Config config;
 
     private final AtomicBoolean waitLoopAllowed = new AtomicBoolean(false);
@@ -160,68 +163,81 @@ public class ExplorationConceptIngestService implements Service {
         return ofNullable(body.get("lastSourceId").textValue());
     }
 
-    void sendMessageToTarget(RawdataMessage message) throws IOException {
-        JsonNode meta = msgPackMapper.readTree(message.get("meta"));
+    void sendMessageToTarget(RawdataMessage message) {
+        try {
+            JsonNode meta = msgPackMapper.readTree(message.get("meta"));
 
-        String method = meta.get("method").textValue();
-        String sourceNamespace = meta.get("namespace").textValue();
-        String entity = meta.get("entity").textValue();
-        String id = meta.get("id").textValue();
-        String versionStr = meta.get("version").textValue();
+            String method = meta.get("method").textValue();
+            String sourceNamespace = meta.get("namespace").textValue();
+            String entity = meta.get("entity").textValue();
+            String id = meta.get("id").textValue();
+            String versionStr = meta.get("version").textValue();
 
-        String namespace = config.get("pipe.target.namespace").asString().get();
-        String source = config.get("pipe.target.source").asString().get();
-        String sourceId = message.ulid().toString();
+            String namespace = config.get("pipe.target.namespace").asString().get();
+            String source = config.get("pipe.target.source").asString().get();
+            String sourceId = message.ulid().toString();
 
-        WebClient webClient = (WebClient) instanceByType.get(WebClient.class);
+            WebClient webClient = (WebClient) instanceByType.get(WebClient.class);
 
-        String path = String.format("/%s/%s/%s", namespace, entity, id);
+            String path = String.format("/%s/%s/%s", namespace, entity, id);
 
-        if ("PUT".equals(method)) {
-            JsonNode data = msgPackMapper.readTree(message.get("data"));
-            WebClientRequestBuilder builder = webClient.put();
-            builder.headers().add("Origin", "localhost");
-            WebClientResponse response = builder
-                    .path(path)
-                    .queryParam("timestamp", versionStr)
-                    .queryParam("source", source)
-                    .queryParam("sourceId", sourceId)
-                    .submit(data)
-                    .toCompletableFuture()
-                    .join();
-            if (!Http.ResponseStatus.Family.SUCCESSFUL.equals(response.status().family())) {
-                LOG.warn("Unsuccessful HTTP response while attempting to perform: PUT {}?timestamp={}&source={}&sourceId={}   DATA: {}",
-                        path,
-                        URLEncoder.encode(versionStr, StandardCharsets.UTF_8),
-                        URLEncoder.encode(source, StandardCharsets.UTF_8),
-                        URLEncoder.encode(sourceId, StandardCharsets.UTF_8),
-                        mapper.writeValueAsString(data)
-                );
-                throw new RuntimeException("Got http status code " + response.status() + " with reason: " + response.status().reasonPhrase());
+            // retry at backoff intervals for about 3 minutes before giving up
+            Retry retry = Retry.of("write-message-to-lds", RetryConfig.custom()
+                    .intervalFunction(IntervalFunction.ofExponentialRandomBackoff(Duration.of(5, ChronoUnit.SECONDS), 2, Duration.of(30, ChronoUnit.SECONDS)))
+                    .maxAttempts(8)
+                    .failAfterMaxAttempts(true)
+                    .build());
+
+            if ("PUT".equals(method)) {
+                JsonNode data = msgPackMapper.readTree(message.get("data"));
+                WebClientResponse response = Retry.decorateSupplier(retry, () -> {
+                    WebClientRequestBuilder builder = webClient.put();
+                    builder.headers().add("Origin", "localhost");
+                    builder.path(path)
+                            .queryParam("timestamp", versionStr)
+                            .queryParam("source", source)
+                            .queryParam("sourceId", sourceId);
+                    return builder.submit(data)
+                            .toCompletableFuture()
+                            .join();
+                }).get();
+                if (!Http.ResponseStatus.Family.SUCCESSFUL.equals(response.status().family())) {
+                    LOG.warn("Unsuccessful HTTP response while attempting to perform: PUT {}?timestamp={}&source={}&sourceId={}   DATA: {}",
+                            path,
+                            URLEncoder.encode(versionStr, StandardCharsets.UTF_8),
+                            URLEncoder.encode(source, StandardCharsets.UTF_8),
+                            URLEncoder.encode(sourceId, StandardCharsets.UTF_8),
+                            data.toString()
+                    );
+                    throw new RuntimeException("Got http status code " + response.status() + " with reason: " + response.status().reasonPhrase());
+                }
+            } else if ("DELETE".equals(method)) {
+                WebClientResponse response = Retry.decorateSupplier(retry, () -> {
+                    WebClientRequestBuilder builder = webClient.delete();
+                    builder.headers().add("Origin", "localhost");
+                    builder.skipUriEncoding()
+                            .path(path)
+                            .queryParam("timestamp", versionStr)
+                            .queryParam("source", source)
+                            .queryParam("sourceId", sourceId);
+                    return builder.submit()
+                            .toCompletableFuture()
+                            .join();
+                }).get();
+                if (!Http.ResponseStatus.Family.SUCCESSFUL.equals(response.status().family())) {
+                    LOG.warn("Unsuccessful HTTP response while attempting to perform: DELETE {}?timestamp={}&source={}&sourceId={}",
+                            path,
+                            URLEncoder.encode(versionStr, StandardCharsets.UTF_8),
+                            URLEncoder.encode(source, StandardCharsets.UTF_8),
+                            URLEncoder.encode(sourceId, StandardCharsets.UTF_8)
+                    );
+                    throw new RuntimeException("Got http status code " + response.status() + " with reason: " + response.status().reasonPhrase());
+                }
+            } else {
+                throw new RuntimeException("Unsupported method: " + method);
             }
-        } else if ("DELETE".equals(method)) {
-            WebClientRequestBuilder builder = webClient.delete();
-            builder.headers().add("Origin", "localhost");
-            WebClientResponse response = builder
-                    .skipUriEncoding()
-                    .path(path)
-                    .queryParam("timestamp", versionStr)
-                    .queryParam("source", source)
-                    .queryParam("sourceId", sourceId)
-                    .submit()
-                    .toCompletableFuture()
-                    .join();
-            if (!Http.ResponseStatus.Family.SUCCESSFUL.equals(response.status().family())) {
-                LOG.warn("Unsuccessful HTTP response while attempting to perform: DELETE {}?timestamp={}&source={}&sourceId={}",
-                        path,
-                        URLEncoder.encode(versionStr, StandardCharsets.UTF_8),
-                        URLEncoder.encode(source, StandardCharsets.UTF_8),
-                        URLEncoder.encode(sourceId, StandardCharsets.UTF_8)
-                );
-                throw new RuntimeException("Got http status code " + response.status() + " with reason: " + response.status().reasonPhrase());
-            }
-        } else {
-            throw new RuntimeException("Unsupported method: " + method);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

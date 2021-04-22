@@ -72,6 +72,11 @@
             <version>0.2</version>
         </dependency>
         <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-all</artifactId>
+            <version>1.7.0</version>
+        </dependency>
+        <dependency>
             <groupId>no.ssb.jpms</groupId>
             <artifactId>jsr305-and-javax.annotation-api</artifactId>
             <version>1.1</version>
