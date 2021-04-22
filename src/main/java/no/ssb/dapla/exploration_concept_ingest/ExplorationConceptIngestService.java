@@ -2,6 +2,7 @@ package no.ssb.dapla.exploration_concept_ingest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.huxhorn.sulky.ulid.ULID;
 import io.helidon.common.http.Http;
 import io.helidon.common.http.MediaType;
@@ -29,6 +30,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -217,17 +224,42 @@ public class ExplorationConceptIngestService implements Service {
                     while (waitLoopAllowed.get()) {
                         RawdataMessage message = consumer.receive(3, TimeUnit.SECONDS);
                         if (message != null) {
-                            sendMessageToTarget(message);
+                            try {
+                                sendMessageToTarget(message);
+                            } catch (Throwable t) {
+                                LOG.debug("While processing/sending rawdata. RawdataMessage: {}", asJson(message));
+                                throw t;
+                            }
                         }
                     }
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
                 }
+            } catch (Throwable t) {
+                LOG.error("Unexpected error", t);
             } finally {
                 instanceByType.remove(Pipe.class);
                 instanceByType.remove(Thread.class);
             }
         }
+    }
+
+    private ObjectNode asJson(RawdataMessage message) {
+        ObjectNode r = msgPackMapper.createObjectNode();
+        r.put("ulid", message.ulid().toString());
+        r.put("position", message.position());
+        r.put("orderingGroup", message.orderingGroup());
+        r.put("sequenceNumber", message.sequenceNumber());
+        r.put("timestamp", ZonedDateTime.ofInstant(Instant.ofEpochMilli(message.timestamp()), ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT));
+        ObjectNode data = r.putObject("data");
+        for (String key : message.keys()) {
+            byte[] valueBytes = message.get(key);
+            try {
+                JsonNode node = msgPackMapper.readTree(valueBytes);
+                data.set(key, node);
+            } catch (IOException e) {
+                data.put(key, valueBytes);
+            }
+        }
+        return r;
     }
 
     public void close() {
